@@ -59,8 +59,6 @@ function parse_args
     elif [[ $make_start == false ]]
     then
       BUILD_ARGS+=("$arg")
-    e
-    se
       MAKE_ARGS+=("$arg")
     fi
 

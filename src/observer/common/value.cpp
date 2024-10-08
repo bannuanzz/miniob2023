@@ -125,10 +125,23 @@ void Value::set_data(char *data, int length)
       value_.bool_value_ = *(int *)data != 0;
       length_            = length;
     } break;
+    case AttrType::DATES: {
+      value_.int_value_ = *(int *)data;
+      length_           = length;
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
   }
+}
+
+void Value::set_date(int year, int month, int day)
+{
+  // yyyymmdd
+  reset();
+  attr_type_        = AttrType::DATES;
+  value_.int_value_ = year * 10000 + month * 100 + day;
+  length_           = sizeof(value_.int_value_);
 }
 
 void Value::set_int(int val)
@@ -190,6 +203,9 @@ void Value::set_value(const Value &value)
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
+    case AttrType::DATES: {
+      set_date(value.get_int(), value.get_int() / 100 % 100, value.get_int() % 100);
+    } break;
     default: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -229,7 +245,10 @@ string Value::to_string() const
   return res;
 }
 
-int Value::compare(const Value &other) const { return DataType::type_instance(this->attr_type_)->compare(*this, other); }
+int Value::compare(const Value &other) const
+{
+  return DataType::type_instance(this->attr_type_)->compare(*this, other);
+}
 
 int Value::get_int() const
 {
@@ -250,6 +269,9 @@ int Value::get_int() const
     }
     case AttrType::BOOLEANS: {
       return (int)(value_.bool_value_);
+    }
+    case AttrType::DATES: {
+      return value_.int_value_;
     }
     default: {
       LOG_WARN("unknown data type. type=%d", attr_type_);
@@ -278,6 +300,9 @@ float Value::get_float() const
     } break;
     case AttrType::BOOLEANS: {
       return float(value_.bool_value_);
+    } break;
+    case AttrType::DATES: {
+      return float(value_.int_value_);
     } break;
     default: {
       LOG_WARN("unknown data type. type=%d", attr_type_);
@@ -319,6 +344,9 @@ bool Value::get_boolean() const
     } break;
     case AttrType::BOOLEANS: {
       return value_.bool_value_;
+    } break;
+    case AttrType::DATES: {
+      return value_.int_value_ != 0;
     } break;
     default: {
       LOG_WARN("unknown data type. type=%d", attr_type_);

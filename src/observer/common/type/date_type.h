@@ -8,17 +8,21 @@ EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
-//
-// Created by wangyunlai on 2021/6/11
-//
-
 #pragma once
 
-namespace common {
+#include "common/type/data_type.h"
 
-int compare_int(void *arg1, void *arg2);
-int compare_float(void *arg1, void *arg2);
-int compare_string(void *arg1, int arg1_max_length, void *arg2, int arg2_max_length);
-bool check_date(int year, int month, int day);
+/**
+ * @brief 整型类型
+ * @ingroup DataType
+ */
+class DateType : public DataType
+{
+public:
+  DateType() : DataType(AttrType::DATES) {}
+  virtual ~DateType() {}
 
-}  // namespace common
+  int compare(const Value &left, const Value &right) const override;
+
+  RC to_string(const Value &val, string &result) const override;
+};

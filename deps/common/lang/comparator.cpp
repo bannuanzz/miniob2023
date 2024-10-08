@@ -66,4 +66,22 @@ int compare_string(void *arg1, int arg1_max_length, void *arg2, int arg2_max_len
   return 0;
 }
 
+bool check_date(int year, int month, int day)
+{
+  if (year < 0 || month < 1 || month > 12 || day < 1) {
+    return false;
+  }
+
+  static const int days_in_month[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (month == 2) {
+    if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) {
+      return day <= 29;
+    } else {
+      return day <= 28;
+    }
+  } else {
+    return day <= days_in_month[month];
+  }
+
+}  // namespace common
 }  // namespace common
