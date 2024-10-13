@@ -131,6 +131,27 @@ RC RecordPageHandler::init(DiskBufferPool &buffer_pool, LogHandler &log_handler,
   return ret;
 }
 
+RC RecordPageHandler::update_record(Record *rec)
+{
+  // 1.合法性检查
+  if (rec->rid().slot_num >= page_header_->record_capacity) {
+    LOG_ERROR(
+        "Invalid slot_num %d, exceed page's record capacity, page_num %d.", rec->rid().slot_num, frame_->page_num());
+    return RC::INVALID_ARGUMENT;
+  }
+  Bitmap bitmap(bitmap_, page_header_->record_capacity);
+  if (!bitmap.get_bit(rec->rid().slot_num)) {
+    LOG_ERROR("Invalid slot_num %d, slot is empty, page_num %d.", rec->rid().slot_num, frame_->page_num());
+    return RC::NOT_EXIST;
+  }
+  // 2.更新record
+  char *record_data = get_record_data(rec->rid().slot_num);  //当前指针指向frame中
+  memcpy(record_data, rec->data(), page_header_->record_real_size);
+  bitmap.set_bit(rec->rid().slot_num);
+  frame_->mark_dirty();
+  return RC::SUCCESS;
+}
+
 RC RecordPageHandler::recover_init(DiskBufferPool &buffer_pool, PageNum page_num)
 {
   if (disk_buffer_pool_ != nullptr) {
@@ -604,6 +625,40 @@ RC RecordFileHandler::insert_record(const char *data, int record_size, RID *rid)
   // 找到空闲位置
   return record_page_handler->insert_record(data, rid);
 }
+
+RC RecordFileHandler::update_record(Record *rec)
+{
+  RC rc = RC::SUCCESS;
+
+  // 创建一个新的 record_page_handler
+  unique_ptr<RecordPageHandler> record_page_handler(RecordPageHandler::create(storage_format_));
+
+  // 获取页面号
+  PageNum page_num = rec->rid().page_num;
+
+  // 加锁以确保对页面的独占访问
+  lock_.lock();
+
+  // 初始化页面处理器
+  rc = record_page_handler->init(*disk_buffer_pool_, *log_handler_, page_num, ReadWriteMode::READ_WRITE);
+
+  // 如果初始化失败，释放锁并返回错误码
+  if (rc != RC::SUCCESS) {
+    lock_.unlock();
+    LOG_ERROR("Failed to init record page handler. page number=%d. rc=%s", page_num, strrc(rc));
+    return rc;
+  }
+
+  // 找到页面后，解锁
+  lock_.unlock();
+
+  // 更新记录
+  rc = record_page_handler->update_record(rec);
+
+  // 返回更新结果
+  return rc;
+}
+
 
 RC RecordFileHandler::recover_insert_record(const char *data, int record_size, const RID &rid)
 {

@@ -182,6 +182,14 @@ public:
   virtual RC insert_record(const char *data, RID *rid) { return RC::UNIMPLEMENTED; }
 
   /**
+   * @brief 更新一条记录
+   *
+   * @param data 要更新的记录
+   */
+
+  virtual RC update_record(Record *rec);
+
+  /**
    * @brief 数据库恢复时，在指定位置插入数据
    *
    * @param data 要插入的数据行
@@ -387,6 +395,14 @@ public:
    * @param rid         返回该记录的标识符
    */
   RC insert_record(const char *data, int record_size, RID *rid);
+
+  /**
+   * @brief 更新一条记录
+   *
+   * @param data 要更新的记录
+   */
+
+  RC update_record(Record *rec);
 
   /**
    * @brief 数据库恢复时，在指定文件指定位置插入数据
