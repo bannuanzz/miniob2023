@@ -131,6 +131,8 @@ FORMAT                                  RETURN_TOKEN(FORMAT);
 "<"                                     RETURN_TOKEN(LT);
 ">="                                    RETURN_TOKEN(GE);
 ">"                                     RETURN_TOKEN(GT);
+"(?i)LIKE"                                  RETURN_TOKEN(LK);
+"(?i)NOT_LIKE"                              RETURN_TOKEN(NLK);
 
 "+" |
 "-" |

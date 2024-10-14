@@ -16,6 +16,9 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 
+#include <regex>
+#include <string>
+
 using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
@@ -91,7 +94,7 @@ RC CastExpr::cast(const Value &value, Value &cast_value) const
 RC CastExpr::get_value(const Tuple &tuple, Value &result) const
 {
   Value value;
-  RC rc = child_->get_value(tuple, value);
+  RC    rc = child_->get_value(tuple, value);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -102,7 +105,7 @@ RC CastExpr::get_value(const Tuple &tuple, Value &result) const
 RC CastExpr::try_get_value(Value &result) const
 {
   Value value;
-  RC rc = child_->try_get_value(value);
+  RC    rc = child_->try_get_value(value);
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -111,6 +114,26 @@ RC CastExpr::try_get_value(Value &result) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+static void replace_all(std::string &str, const std::string &from, const std::string &to)
+{
+  if (from.empty()) {
+    return;
+  }
+  size_t pos = 0;
+  while (std::string::npos != (pos = str.find(from, pos))) {
+    str.replace(pos, from.length(), to);
+    pos += to.length();  // in case 'to' contains 'from'
+  }
+}
+static bool str_like(const Value &left, const Value &right)
+{
+  std::string raw_reg(right.data());
+  replace_all(raw_reg, "_", "[^']");
+  replace_all(raw_reg, "%", "[^']*");
+  std::regex reg(raw_reg.c_str(), std::regex_constants::ECMAScript | std::regex_constants::icase);
+  bool res = std::regex_match(left.data(), reg);
+  return res;
+}
 
 ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<Expression> right)
     : comp_(comp), left_(std::move(left)), right_(std::move(right))
@@ -120,8 +143,12 @@ ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
-  RC  rc         = RC::SUCCESS;
-  int cmp_result = left.compare(right);
+  RC  rc = RC::SUCCESS;
+  int cmp_result;
+
+  if (comp_ != LIKE && comp_ != NOT_LIKE) {
+    cmp_result = left.compare(right);
+  }
   result         = false;
   switch (comp_) {
     case EQUAL_TO: {
@@ -142,6 +169,12 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     case GREAT_THAN: {
       result = (cmp_result > 0);
     } break;
+    case LIKE: {
+      result = str_like(left, right);
+    } break;
+    case NOT_LIKE: {
+      result = !str_like(left, right);
+    } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
       rc = RC::INTERNAL;
@@ -154,8 +187,8 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
 RC ComparisonExpr::try_get_value(Value &cell) const
 {
   if (left_->type() == ExprType::VALUE && right_->type() == ExprType::VALUE) {
-    ValueExpr *  left_value_expr  = static_cast<ValueExpr *>(left_.get());
-    ValueExpr *  right_value_expr = static_cast<ValueExpr *>(right_.get());
+    ValueExpr   *left_value_expr  = static_cast<ValueExpr *>(left_.get());
+    ValueExpr   *right_value_expr = static_cast<ValueExpr *>(right_.get());
     const Value &left_cell        = left_value_expr->get_value();
     const Value &right_cell       = right_value_expr->get_value();
 
