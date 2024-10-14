@@ -15,10 +15,13 @@ See the Mulan PSL v2 for more details. */
 #include <limits.h>
 #include <string.h>
 
+
+
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/lang/span.h"
 #include "common/lang/algorithm.h"
+#include "common/lang/defer.h"
 #include "common/log/log.h"
 #include "common/global_context.h"
 #include "storage/db/db.h"
@@ -609,6 +612,11 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
 
   char *old_data = record.data();
   char *data     = new char[table_meta_.record_size()];  // new_record->data
+  DEFER([&]() {
+    delete[] data;  // 使用 delete[] 释放
+    data = nullptr;
+    record.set_data(old_data);
+  });
 
   memcpy(data, old_data, table_meta_.record_size());
 
