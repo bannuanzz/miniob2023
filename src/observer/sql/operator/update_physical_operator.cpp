@@ -72,7 +72,7 @@ RC UpdatePhysicalOperator::next()
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
       // old_records中最后一条记录是刚才更新失败的，不需要回滚
-      for (size_t i = old_records_.size() - 2; i >= 0; i--) {
+      for (int i = static_cast<int>(old_records_.size() - 2); i >= 0; i--) {
         RC                   rc2 = RC::SUCCESS;
         Record               updated_record;
         std::vector<Value *> old_row_values;
@@ -101,9 +101,9 @@ RC UpdatePhysicalOperator::close()
 
 RC UpdatePhysicalOperator::extract_old_value(Record &record)
 {
-  RC        rc             = RC::SUCCESS;
-  int       field_offset   = -1;
-  int       field_length   = -1;
+  RC  rc           = RC::SUCCESS;
+  int field_offset = -1;
+  int field_length = -1;
   // int       field_index    = -1;
   bool      same_data      = true;  // 标识当前行数据更新后，是否与更前相同
   const int sys_field_num  = table_->table_meta().sys_field_num();
@@ -146,7 +146,12 @@ RC UpdatePhysicalOperator::extract_old_value(Record &record)
       LOG_WARN("field not find ,field name = %s", attr_name);
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
-    if (same_data) {
+    // 获取数据长度
+    size_t record_data_length = record.len();     // 假设有一个方法获取数据长度
+    size_t value_data_length  = value->length();  // 假设有一个方法获取数据长度
+
+    // 检查 field_offset 和 field_length 是否在合理范围内
+    if (field_offset + field_length <= record_data_length && field_length <= value_data_length) {
       if (0 != memcmp(record.data() + field_offset, value->data(), field_length)) {
         same_data = false;
       }

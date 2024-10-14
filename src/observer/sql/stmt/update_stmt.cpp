@@ -65,6 +65,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
       {
         if (update_field->type() == AttrType::CHARS && update_field->len() < update.values[i].length()) {
           LOG_WARN("update chars with longer length");
+          // return RC::INVALID_ARGUMENT;
         } else {
           valid = true;
         }
