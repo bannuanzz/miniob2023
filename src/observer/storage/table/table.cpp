@@ -15,8 +15,6 @@ See the Mulan PSL v2 for more details. */
 #include <limits.h>
 #include <string.h>
 
-
-
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/lang/span.h"
@@ -644,8 +642,8 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
             field_meta->name(),
             attr_type,
             value_type);
-        delete[] data;
-        data = nullptr;
+        // delete[] data;
+        // data = nullptr;
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       field_offset = field_meta->offset();
@@ -655,8 +653,8 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
     }
     if (field_length < 0 || field_offset < 0) {
       LOG_WARN("field not find ,field name = %s", attr_name);
-      delete[] data;
-      data = nullptr;
+      // delete[] data;
+      // data = nullptr;
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
 
@@ -684,8 +682,8 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
         record.rid().slot_num,
         rc,
         strrc(rc));
-    delete[] data;
-    data = nullptr;
+    // delete[] data;
+    // data = nullptr;
     return rc;
   }
 
@@ -698,8 +696,8 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
           rc2,
           strrc(rc2));
     }
-    delete[] data;
-    data = nullptr;
+    // delete[] data;
+    // data = nullptr;
     return rc;  // 插入新的索引失败
   }
 
@@ -707,13 +705,13 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
   if (rc != RC::SUCCESS) {
     LOG_ERROR(
         "Failed to update record (rid=%d.%d). rc=%d:%s", record.rid().page_num, record.rid().slot_num, rc, strrc(rc));
-    delete[] data;
-    data = nullptr;
+    // delete[] data;
+    // data = nullptr;
     return rc;
   }
 
-  delete[] data;
-  data = nullptr;
+  // delete[] data;
+  // data = nullptr;
   record.set_data(old_data);
   return rc;
 }
