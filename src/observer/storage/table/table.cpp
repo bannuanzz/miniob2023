@@ -607,8 +607,9 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
   const int sys_field_num  = table_meta_.sys_field_num();
   const int user_field_num = table_meta_.field_num() - sys_field_num;
 
-  char *old_data = record.data();                  
+  char *old_data = record.data();
   char *data     = new char[table_meta_.record_size()];  // new_record->data
+
   memcpy(data, old_data, table_meta_.record_size());
 
   for (size_t c_idx = 0; c_idx < attr_names.size(); c_idx++) {
@@ -636,6 +637,7 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
             attr_type,
             value_type);
         delete[] data;
+        data = nullptr;
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       field_offset = field_meta->offset();
@@ -646,6 +648,7 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
     if (field_length < 0 || field_offset < 0) {
       LOG_WARN("field not find ,field name = %s", attr_name);
       delete[] data;
+      data = nullptr;
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
 
@@ -674,6 +677,7 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
         rc,
         strrc(rc));
     delete[] data;
+    data = nullptr;
     return rc;
   }
 
@@ -687,6 +691,7 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
           strrc(rc2));
     }
     delete[] data;
+    data = nullptr;
     return rc;  // 插入新的索引失败
   }
 
@@ -694,11 +699,13 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
   if (rc != RC::SUCCESS) {
     LOG_ERROR(
         "Failed to update record (rid=%d.%d). rc=%d:%s", record.rid().page_num, record.rid().slot_num, rc, strrc(rc));
-    delete[] data; 
+    delete[] data;
+    data = nullptr;
     return rc;
   }
 
   delete[] data;
+  data = nullptr;
   record.set_data(old_data);
   return rc;
 }

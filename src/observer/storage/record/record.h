@@ -140,37 +140,24 @@ public:
     return *this;
   }
 
-  // Record(Record &&other)
-  // {
-  //   rid_ = other.rid_;
-
-  //   if (!other.owner_) {
-  //     data_        = other.data_;
-  //     len_         = other.len_;
-  //     other.data_  = nullptr;
-  //     other.len_   = 0;
-  //     this->owner_ = false;
-  //   } else {
-  //     data_        = other.data_;
-  //     len_         = other.len_;
-  //     other.data_  = nullptr;
-  //     other.len_   = 0;
-  //     this->owner_ = true;
-  //   }
-  // }
-
-  void deep_copy(const Record &other)
+  Record(Record &&other)
   {
-    rid_   = other.rid_;
-    len_   = other.len_;
-    owner_ = true;
+    rid_ = other.rid_;
 
-    char *tmp = (char *)malloc(other.len_);
-    ASSERT(nullptr != tmp, "failed to allocate memory. size=%d", other.len_);
-    memcpy(tmp, other.data_, other.len_);
-    data_ = tmp;
+    if (!other.owner_) {
+      data_        = other.data_;
+      len_         = other.len_;
+      other.data_  = nullptr;
+      other.len_   = 0;
+      this->owner_ = false;
+    } else {
+      data_        = other.data_;
+      len_         = other.len_;
+      other.data_  = nullptr;
+      other.len_   = 0;
+      this->owner_ = true;
+    }
   }
-
   Record &operator=(Record &&other)
   {
     if (this == &other) {
