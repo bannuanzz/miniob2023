@@ -15,11 +15,10 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/update_stmt.h"
 #include "storage/db/db.h"  // Include the header file for the Db class
 
-UpdateStmt::UpdateStmt(Table *table, const Value *values, int value_amount, FieldMeta field, FilterStmt *filter_stmt)
-    : table_(table), values_(values), value_amount_(value_amount), filter_stmt_(filter_stmt)
-{
-  fields_.push_back(field);
-}
+UpdateStmt::UpdateStmt(
+    Table *table, std::vector<FieldMeta> fields, std::vector<Value *> values, FilterStmt *filter_stmt)
+    : table_(table), fields_(std::move(fields)), values_(std::move(values)), filter_stmt_(filter_stmt)
+{}
 
 UpdateStmt::~UpdateStmt()
 {
@@ -38,6 +37,10 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     LOG_WARN("invalid argument. db=%p, table_name=%p",db, table_name);
     return RC::INVALID_ARGUMENT;
   }
+  if (update.attribute_names.size() != update.values.size()) {
+    LOG_WARN("invalid argument, column size not match value size");
+    return RC::INVALID_ARGUMENT;
+  }
   // check whether the table exists
   Table *table = db->find_table(table_name);
   if (nullptr == table) {
@@ -46,30 +49,33 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
   }
   // check fields type
   // update t1 set c1 = 1;
-  const TableMeta &table_meta = table->table_meta();
+
   // const int        sys_field_num = table_meta.sys_field_num();
   // 1.检查 表t1 有没有c1 列
   // 2.检查 c1 列的类型 与 1 是否匹配
-  const std::vector<FieldMeta> *fieldMeta = table_meta.field_metas();
-
-  bool                   valid = false;
-  std::vector<FieldMeta> update_field;
-  for (FieldMeta field : *fieldMeta) {
-    if (0 == strcmp(field.name(), update.attribute_name.c_str())) {
-      if (field.type() == update.value.attr_type()) {
-        if (field.type() == AttrType::CHARS && field.len() < update.value.length()) {
-          LOG_WARN("update field length mismatch. table=%s",table_name);
-          return RC::INVALID_ARGUMENT;
+  const TableMeta       &table_meta = table->table_meta();
+  std::vector<Value *>   values;
+  std::vector<FieldMeta> fields;
+  for (size_t i = 0; i < update.attribute_names.size(); i++) {
+    const FieldMeta *update_field = table_meta.field(update.attribute_names[i].c_str());
+    bool             valid        = false;
+    if (update_field != nullptr)
+      if (update_field->type() == update.values[i].attr_type())
+      // (update.values[i].is_null() && update_field->nullable() {
+      {
+        if (update_field->type() == AttrType::CHARS && update_field->len() < update.values[i].length()) {
+          LOG_WARN("update chars with longer length");
+        } else {
+          valid = true;
         }
-        valid = true;
-        update_field.push_back(field);
-        break;
       }
+
+    if (!valid) {
+      LOG_WARN("update field type mismatch. table=%s",table_name);
+      return RC::INVALID_ARGUMENT;
     }
-  }
-  if (!valid) {
-    LOG_WARN("update field type mismatch. table=%s",table_name);
-    return RC::INVALID_ARGUMENT;
+    fields.emplace_back(*update_field);
+    values.emplace_back(const_cast<Value *>(&update.values[i]));
   }
 
   std::unordered_map<std::string, Table *> table_map;
@@ -82,6 +88,7 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
     return rc;
   }
   // everything alright
-  stmt = new UpdateStmt(table, &(update.value), 1, update_field[0], filter_stmt);
+
+  stmt = new UpdateStmt(table, std::move(fields), std::move(values), filter_stmt);
   return RC::SUCCESS;
 }

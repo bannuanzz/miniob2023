@@ -29,7 +29,7 @@ class UpdateStmt : public Stmt
 {
 public:
   UpdateStmt() = default;
-  UpdateStmt(Table *table, const Value *values, int value_amount, FieldMeta field, FilterStmt *filter_stmt);
+  UpdateStmt(Table *table, std::vector<FieldMeta> fields, std::vector<Value *> values, FilterStmt *filter_stmt);
   virtual ~UpdateStmt();
 
 public:
@@ -37,16 +37,15 @@ public:
 
 public:
   Table                  *table() const { return table_; }
-  const Value            *values() const { return values_; }
-  int                     value_amount() const { return value_amount_; }
+  std::vector<Value *>   &values() { return values_; }
+  int                     value_amount() const { return fields_.size(); }
   StmtType                type() const override { return StmtType::UPDATE; }
-  std::vector<FieldMeta> *field() { return &fields_; }
+  std::vector<FieldMeta> &field() { return fields_; }
   FilterStmt             *filter_stmt() const { return filter_stmt_; }
 
 private:
-  Table                 *table_        = nullptr;
-  const Value           *values_       = nullptr;
-  int                    value_amount_ = 0;
+  Table                 *table_ = nullptr;
   std::vector<FieldMeta> fields_;  //被更新的列
-  FilterStmt            *filter_stmt_ = nullptr;
+  std::vector<Value *>   values_;
+  FilterStmt *filter_stmt_ = nullptr;
 };

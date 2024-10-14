@@ -83,8 +83,8 @@ public:
   RC get_record(const RID &rid, Record &record);
 
   //
-  RC update_record(Record &record,const char *field_name, Value *value);
-
+  RC update_record(Record &record, const char *field_name, Value *value);
+  RC update_record(Record &record,const std::vector<std::string> field_name,const std::vector<Value *> values);
 
   RC recover_insert_record(Record &record);
 

@@ -26,20 +26,20 @@ See the Mulan PSL v2 for more details. */
 class UpdateLogicalOperator : public LogicalOperator
 {
 public:
-  UpdateLogicalOperator(Table *table, std::vector<Value> &values, std::vector<FieldMeta> &fields);
+  UpdateLogicalOperator(Table *table, std::vector<Value *> &values, std::vector<FieldMeta> &fields);
   virtual ~UpdateLogicalOperator() = default;
 
   LogicalOperatorType type() const override { return LogicalOperatorType::UPDATE; }
 
   Table                    *table() const { return table_; }
-  const std::vector<Value> &values() const { return values_; }
-  std::vector<Value>       &values() { return values_; }
+  const std::vector<Value*> &values() const { return values_; }
+  std::vector<Value*>       &values() { return values_; }
 
   const std::vector<FieldMeta> &fields() const { return fields_; }
   std::vector<FieldMeta>       &fields() { return fields_; }
 
 private:
   Table                 *table_ = nullptr;
-  std::vector<Value>     values_;
+  std::vector<Value*>     values_;
   std::vector<FieldMeta> fields_;
 };

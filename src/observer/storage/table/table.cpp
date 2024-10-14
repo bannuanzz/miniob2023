@@ -583,85 +583,122 @@ RC Table::sync()
   return rc;
 }
 
-RC Table::update_record(Record &record, const char *field_name, Value *value)
+RC Table::update_record(Record &record, const char *attr_name, Value *value)
+{
+  std::vector<Value *> values;
+  values.emplace_back(value);
+  std::vector<std::string> attr_names;
+  attr_names.emplace_back(attr_name);
+  return update_record(record, attr_names, values);
+}
+
+RC Table::update_record(Record &record, const std::vector<std::string> attr_names, const std::vector<Value *> values)
 {
   RC rc = RC::SUCCESS;
-  // 1.先要找到这个字段
-  // 2.看类型是否匹配
-  // 3.获得该列的offset和长度
-  const FieldMeta *field_meta = table_meta_.field(field_name);
-  if (field_meta == nullptr) {
-    LOG_WARN("field not found. table=%s, field=%s", name(), field_name);
-    return RC::SCHEMA_FIELD_MISSING;
+  if (attr_names.size() != values.size() || 0 == attr_names.size()) {
+    rc = RC::INVALID_ARGUMENT;
+    LOG_WARN("fields size not match values, or empty param");
+    return rc;
   }
-  int       field_offset   = -1;
-  int       field_len      = -1;
-  bool      is_index       = false;  //是否有索引
+
+  int field_offset = -1;
+  int field_length = -1;
+  // int       field_index    = -1;
   const int sys_field_num  = table_meta_.sys_field_num();
   const int user_field_num = table_meta_.field_num() - sys_field_num;
-  for (int i = 0; i < user_field_num; i++) {
-    const FieldMeta *field_meta = table_meta_.field(i + sys_field_num);
-    const char      *name       = field_meta->name();
-    if (0 != strcmp(name, field_name)) {
-      continue;
-    }
-    AttrType type       = field_meta->type();
-    AttrType value_type = value->attr_type();
-    if (type != value_type) {
-      LOG_WARN("field type not match. table=%s, field=%s, field_type=%d, value_type=%d",
-              table_meta_.name(), name, type, value_type);
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
 
-    field_offset = field_meta->offset();
-    field_len    = field_meta->len();
-    if (nullptr != find_index_by_field(field_name)) {
-      is_index = true;
-    }
-    break;
-  }
+  char *old_data = record.data();                  
+  char *data     = new char[table_meta_.record_size()];  // new_record->data
+  memcpy(data, old_data, table_meta_.record_size());
 
-  if (field_offset < 0 || field_len < 0) {
-    LOG_WARN("field not found. table=%s, field=%s", name(), field_name);
-    return RC::SCHEMA_FIELD_MISSING;
-  }
+  for (size_t c_idx = 0; c_idx < attr_names.size(); c_idx++) {
+    Value             *value     = values[c_idx];
+    const std::string &attr_name = attr_names[c_idx];
 
-  if (0 == memcmp(record.data() + field_offset, value->data(), field_len)) {
-    LOG_WARN("field value not changed. table=%s, field=%s", name(), field_name);
-    return RC::SUCCESS;  //应该新设置一个错误码
-  }
-
-  // 4.更新记录
-  char *old_data = record.data();  // old_data不能释放  //TODO:具体怎么样还没研究
-  char *new_data = new char[table_meta_.record_size()];
-  memcpy(new_data, old_data, table_meta_.record_size());      //复制一份数据
-  memcpy(new_data + field_offset, value->data(), field_len);  //更新数据
-  record.set_data(new_data);                                  //这里有一个set_data_owner 会干什么?
-  if (is_index) {
-    rc = insert_entry_of_indexes(record.data(), record.rid());
-    if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-      RC rc2 = delete_entry_of_indexes(old_data, record.rid(), false);
-      if (rc2 != RC::SUCCESS) {
-        LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                  name(), rc2, strrc(rc2));
+    // 1.先找到要更新的列
+    // 2.判断类型是否匹配
+    // 3.获取该列的 offset 和 长度
+    for (int i = 0; i < user_field_num; ++i) {
+      const FieldMeta *field_meta = table_meta_.field(i + sys_field_num);
+      const char      *field_name = field_meta->name();
+      if (0 != strcmp(field_name, attr_name.c_str())) {
+        continue;
       }
-      return rc;
+      AttrType attr_type  = field_meta->type();
+      AttrType value_type = value->attr_type();
+      // if (value->is_null() && field_meta->nullable()) {
+      //   // ok
+      // } else
+      if (attr_type != value_type) {
+        LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
+            name(),
+            field_meta->name(),
+            attr_type,
+            value_type);
+        delete[] data;
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      field_offset = field_meta->offset();
+      field_length = field_meta->len();
+      // field_index  = i + sys_field_num;
+      break;
     }
-  }
+    if (field_length < 0 || field_offset < 0) {
+      LOG_WARN("field not find ,field name = %s", attr_name);
+      delete[] data;
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
 
-  record_handler_->update_record(&record);
+    // const FieldMeta *null_field = table_meta_.null_field();
+
+    // 写入新的值
+    // common::Bitmap new_null_bitmap(data + null_field->offset(), table_meta_.field_num());
+    // if (value->is_null()) {
+    //   new_null_bitmap.set_bit(field_index);
+    // } else {
+    // new_null_bitmap.clear_bit(field_index);
+    memcpy(data + field_offset, value->data(), field_length);
+    // }
+  }
+  // if (same_data) {
+  //   LOG_WARN("update old value equals new value");
+  //   return RC::RECORD_DUPLICATE_KEY;
+  // }
+  record.set_data(data);  // 谁来管理old_data呢？
+
+  rc = delete_entry_of_indexes(old_data, record.rid(), false);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to update record. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
-    return rc;
-  }
-  if (is_index) {
-    rc = delete_entry_of_indexes(old_data, record.rid(), false);
-    if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc, strrc(rc));
-    }
+    LOG_ERROR("Failed to delete indexes of record (rid=%d.%d). rc=%d:%s",
+        record.rid().page_num,
+        record.rid().slot_num,
+        rc,
+        strrc(rc));
+    delete[] data;
     return rc;
   }
 
+  rc = insert_entry_of_indexes(record.data(), record.rid());
+  if (rc != RC::SUCCESS) {  // 插入失败，需要把旧索引插回去
+    RC rc2 = insert_entry_of_indexes(old_data, record.rid());
+    if (rc2 != RC::SUCCESS) {
+      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
+          name(),
+          rc2,
+          strrc(rc2));
+    }
+    delete[] data;
+    return rc;  // 插入新的索引失败
+  }
+
+  rc = record_handler_->update_record(&record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR(
+        "Failed to update record (rid=%d.%d). rc=%d:%s", record.rid().page_num, record.rid().slot_num, rc, strrc(rc));
+    delete[] data; 
+    return rc;
+  }
+
+  delete[] data;
+  record.set_data(old_data);
   return rc;
 }
