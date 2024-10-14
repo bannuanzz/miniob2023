@@ -131,27 +131,6 @@ RC RecordPageHandler::init(DiskBufferPool &buffer_pool, LogHandler &log_handler,
   return ret;
 }
 
-RC RecordPageHandler::update_record(Record *rec)
-{
-  // 1.合法性检查
-  if (rec->rid().slot_num >= page_header_->record_capacity) {
-    LOG_ERROR(
-        "Invalid slot_num %d, exceed page's record capacity, page_num %d.", rec->rid().slot_num, frame_->page_num());
-    return RC::INVALID_ARGUMENT;
-  }
-  Bitmap bitmap(bitmap_, page_header_->record_capacity);
-  if (!bitmap.get_bit(rec->rid().slot_num)) {
-    LOG_ERROR("Invalid slot_num %d, slot is empty, page_num %d.", rec->rid().slot_num, frame_->page_num());
-    return RC::NOT_EXIST;
-  }
-  // 2.更新record
-  char *record_data = get_record_data(rec->rid().slot_num);  //当前指针指向frame中
-  memcpy(record_data, rec->data(), page_header_->record_real_size);
-  bitmap.set_bit(rec->rid().slot_num);
-  frame_->mark_dirty();
-  return RC::SUCCESS;
-}
-
 RC RecordPageHandler::recover_init(DiskBufferPool &buffer_pool, PageNum page_num)
 {
   if (disk_buffer_pool_ != nullptr) {
@@ -424,6 +403,26 @@ RC RowRecordPageHandler::get_record(const RID &rid, Record &record)
   record.set_data(get_record_data(rid.slot_num), page_header_->record_real_size);
   return RC::SUCCESS;
 }
+RC RowRecordPageHandler::update_record(Record *rec)
+{
+  // 1.合法性检查
+  if (rec->rid().slot_num >= page_header_->record_capacity) {
+    LOG_ERROR(
+        "Invalid slot_num %d, exceed page's record capacity, page_num %d.", rec->rid().slot_num, frame_->page_num());
+    return RC::INVALID_ARGUMENT;
+  }
+  Bitmap bitmap(bitmap_, page_header_->record_capacity);
+  if (!bitmap.get_bit(rec->rid().slot_num)) {
+    LOG_ERROR("Invalid slot_num %d, slot is empty, page_num %d.", rec->rid().slot_num, frame_->page_num());
+    return RC::NOT_EXIST;
+  }
+  // 2.更新record
+  char *record_data = get_record_data(rec->rid().slot_num);  //当前指针指向frame中
+  memcpy(record_data, rec->data(), page_header_->record_real_size);
+  bitmap.set_bit(rec->rid().slot_num);
+  frame_->mark_dirty();
+  return RC::SUCCESS;
+}
 
 PageNum RecordPageHandler::get_page_num() const
 {
@@ -631,7 +630,8 @@ RC RecordFileHandler::update_record(Record *rec)
   RC rc = RC::SUCCESS;
 
   // 创建一个新的 record_page_handler
-  unique_ptr<RecordPageHandler> record_page_handler(RecordPageHandler::create(storage_format_));
+  unique_ptr<RowRecordPageHandler> record_page_handler(
+      static_cast<RowRecordPageHandler *>(RecordPageHandler::create(storage_format_)));
 
   // 获取页面号
   PageNum page_num = rec->rid().page_num;
@@ -658,7 +658,6 @@ RC RecordFileHandler::update_record(Record *rec)
   // 返回更新结果
   return rc;
 }
-
 
 RC RecordFileHandler::recover_insert_record(const char *data, int record_size, const RID &rid)
 {

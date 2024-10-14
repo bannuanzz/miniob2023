@@ -102,8 +102,8 @@ extern int yydebug;
     LE = 303,                      /* LE  */
     GE = 304,                      /* GE  */
     NE = 305,                      /* NE  */
-    LK = 306,                      /* LK  */
-    NLK = 307,                     /* NLK  */
+    NOT = 306,                     /* NOT  */
+    LIKE = 307,                    /* LIKE  */
     NUMBER = 308,                  /* NUMBER  */
     FLOAT = 309,                   /* FLOAT  */
     ID = 310,                      /* ID  */

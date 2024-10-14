@@ -146,7 +146,7 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   RC  rc = RC::SUCCESS;
   int cmp_result;
 
-  if (comp_ != LIKE && comp_ != NOT_LIKE) {
+  if (comp_ != LIKE_OP && comp_ != NOT_LIKE_OP) {
     cmp_result = left.compare(right);
   }
   result         = false;
@@ -169,10 +169,10 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     case GREAT_THAN: {
       result = (cmp_result > 0);
     } break;
-    case LIKE: {
+    case LIKE_OP: {
       result = str_like(left, right);
     } break;
-    case NOT_LIKE: {
+    case NOT_LIKE_OP: {
       result = !str_like(left, right);
     } break;
     default: {
