@@ -105,7 +105,7 @@ RC UpdatePhysicalOperator::extract_old_value(Record &record)
   int field_offset = -1;
   int field_length = -1;
   // int       field_index    = -1;
-  bool      same_data      = true;  // 标识当前行数据更新后，是否与更前相同
+  // bool      same_data      = true;  // 标识当前行数据更新后，是否与更前相同
   const int sys_field_num  = table_->table_meta().sys_field_num();
   const int user_field_num = table_->table_meta().field_num() - sys_field_num;
 
@@ -138,24 +138,33 @@ RC UpdatePhysicalOperator::extract_old_value(Record &record)
       }
       field_offset = field_meta->offset();
       field_length = field_meta->len();
+
       // field_index  = i + sys_field_num;
       old_value.emplace_back(attr_type, record.data() + field_offset, field_length);
       break;
     }
+
+    // cout << "field_length: " << field_length << endl;
+    // cout << endl << "field_length :" << field_length << "value.length:" << value->length() << endl;
     if (field_length < 0 || field_offset < 0) {
       LOG_WARN("field not find ,field name = %s", attr_name);
       return RC::SCHEMA_FIELD_NOT_EXIST;
     }
-    // 获取数据长度
-    size_t record_data_length = record.len();     // 假设有一个方法获取数据长度
-    size_t value_data_length  = value->length();  // 假设有一个方法获取数据长度
-
-    // 检查 field_offset 和 field_length 是否在合理范围内
-    if (field_offset + field_length <= record_data_length && field_length <= value_data_length) {
-      if (0 != memcmp(record.data() + field_offset, value->data(), field_length)) {
-        same_data = false;
-      }
+    if (value->length() > field_length) {
+      LOG_WARN("update value length is longer than field length, field name = %s", attr_name);
+      return RC::INVALID_ARGUMENT;
     }
+
+    // 确保 field_offset 和 field_length 不会导致越界访问
+    if (field_offset < 0 || field_offset + field_length > record.len()) {
+      LOG_ERROR("field_offset or field_length out of bounds, field_offset = %d, field_length = %d", field_offset, field_length);
+      return RC::INVALID_ARGUMENT;
+    }
+    // TODO:暂时为实现
+    // FIXME: 因为value的访问有些问题所以没有实现 主要是value如果是17位的话，你的field的有20位会非法访问value
+    //  if (0 != memcmp(record.data() + field_offset, value->data(), field_length)) {
+    //    same_data = false;
+    //  }
 
     // 判断 新值与旧值是否相等
     //对null的处理暂时忽略
@@ -171,10 +180,11 @@ RC UpdatePhysicalOperator::extract_old_value(Record &record)
     //   }
     // }
   }
-  if (same_data) {
-    LOG_WARN("update old value equals new value, skip this record");
-    return RC::RECORD_DUPLICATE_KEY;
-  }
+
+  // if (same_data) {
+  //   LOG_WARN("update old value equals new value, skip this record");
+  //   return RC::RECORD_DUPLICATE_KEY;
+  // }
   old_values_.emplace_back(std::move(old_value));
   old_records_.emplace_back(record.rid());
   return rc;

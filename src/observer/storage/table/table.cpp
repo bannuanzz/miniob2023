@@ -609,14 +609,14 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
   const int user_field_num = table_meta_.field_num() - sys_field_num;
 
   char *old_data = record.data();
-  char *data     = new char[table_meta_.record_size()];  // new_record->data
+  char *data     = new char[record.len()];  // new_record->data
   DEFER([&]() {
     delete[] data;  // 使用 delete[] 释放
     data = nullptr;
     record.set_data(old_data);
   });
 
-  memcpy(data, old_data, table_meta_.record_size());
+  memcpy(data, old_data, record.len());
 
   for (size_t c_idx = 0; c_idx < attr_names.size(); c_idx++) {
     Value             *value     = values[c_idx];
@@ -666,7 +666,14 @@ RC Table::update_record(Record &record, const std::vector<std::string> attr_name
     //   new_null_bitmap.set_bit(field_index);
     // } else {
     // new_null_bitmap.clear_bit(field_index);
-    memcpy(data + field_offset, value->data(), field_length);
+    int len = 0;
+    if (value->length() < field_length) {
+      len = value->length();
+    } else {
+      len = field_length;
+    }
+    memset(data + field_offset, 0, field_length);
+    memcpy(data + field_offset, value->data(), len);
     // }
   }
   // if (same_data) {
